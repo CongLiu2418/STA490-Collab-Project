@@ -1,0 +1,683 @@
+---
+title: "Mechanical stressors change DNA methylation of MSCs"
+subtitle: "Formation of Mesenchymal Stromal Cell Myofibroblast Phenotypes (MSC-MF)"
+author: "Cong Liu"
+date: "2023-04-10"
+output:
+  pdf_document: default
+lang: en
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r install and import libraries, warning=FALSE, message=FALSE}
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+# for table footnote
+#install.packages("kableExtra")
+library(kableExtra)
+# for dunnett's (T3) test
+#install.packages("PMCMRplus")
+library(PMCMRplus)
+library(ggstatsplot)
+
+
+#install.packages("DescTools")
+#library(DescTools)
+# install.packages("multcomp")
+#library(multcomp)
+
+```
+
+# Abstract
+
+Previous research has shown evidence that mechanical stressors lead to the activation of Mesenchymal Stromal Cell Myofibroblast Phenotypes (MSC-MF), in which DNA methylation plays a role in the phenotypic change. Controlled cell experiments are conducted to study the effect of TRAP-6, LPA and extracellular stretching on the MSCs’ DNA methylation level, respectively. One-way ANOVA and post-hoc comparison tests show a notable increase in DNA methylation levels for cells treated with TRAP-6 and LPA. Yet possibly due to cell detachment, post-stretching DNA methylation decreases.  
+
+\newpage
+
+# Introduction
+
+Scarring is a natural byproduct of the biological process of wound healing, while **Mesenchymal Stromal Cells (MSC)** have been found to induce wound healing with less visible scarring. MSCs manifest in regenerative and profibrotic phenotypes. Activation of the profibrotic **Myofibroblast (MF)** phenotype leads to extra fibrosis and scar formation. 
+
+The appealing property of MSC in tissue regeneration motivates the investigation of its potential in wound therapeutics. Previous research has determined that the phenotypic alteration of MSC results from epigenetic changes, one of which is the addition of a methyl group to DNA ([\textcolor{blue} {Schuster et al.}](https://cshperspectives.cshlp.org/content/early/2022/09/19/cshperspect.a041231.full.pdf)). A better understanding of the mechanism underlying DNA methylation can guide us on how to inhibit the expression of MSC-MF and thus tap into the MSC's therapeutic potential. In particular, we are studying **how mechanical stress regulates the DNA methylation patterns responsible for MSC-MF** *in vitro* (i.e. in controlled cell experiments).
+
+Our analysis is to statistically verify the research hypothesis that mechanically induced chromatin stretching makes DNA more accessible for methylation, leading to a memorized gene expression profile in MSCs. The analysis leverages the experiment data after pooling and cleaning, both processes are shown in the **Appendix**. 
+
+The in vitro experiments use MSCs derived from rat bone marrow. The cells are cultured on soft silicone. Growing in a soft environment aims to eliminate the confounding effects of environmental stress in inducing the MF phenotype. It has been found that MSC has "mechanical memory" such that its regenerative potential is preserved by growing on a soft substrate ([\textcolor{blue} {Schuster et al.}](https://cshperspectives.cshlp.org/content/early/2022/09/19/cshperspect.a041231.full.pdf)). A variety of mechanical stressors is then applied to understand the mechanism that regulates DNA methylation.
+
+Choices of mechanical stressors are supported by findings from published literature. There is in vivo evidence that chronic exposure to the thrombin receptor activating peptide 6 (**TRAP-6**) post-injury leads to the appearance of the myofibroblast phenotype ([\textcolor{blue} {Bogatkevich et al.}](https://www.sciencedirect.com/science/article/pii/S002192581982728X#cesec10)). Likewise, lysophosphatidic acid (**LPA**) is also validated to induce the differentiation of MSCs into myofibroblasts ([\textcolor{blue} {Tang et al.}](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3916127/)). Apart from contraction-inducing agonists, mechanical loading has also been shown to influence the epigenetic signatures of MSC ([\textcolor{blue} {Cakouros and Gronthos}](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7532954/)). 
+
+The experiment studies the respective effect of TRAP-6, LPA and extracellular stretching on the DNA methylation level of the MSCs. In later sections, the first two treatments are referred to as **Aim 1**, while \textcolor{red} {stretching} will be referred to as \textcolor{red} {\bf Aim 2}, for simplicity.
+
+After applying the treatments, cell samples are stained with the 5mc antibody to detect DNA methylation. The green immunofluorescence is an indicator for methylated DNA and its intensity quantifies the DNA methylation level. The 5mc intensity has a positive relationship with the cell DNA methylation level. In experiments using TRAP-6 and LPA, to study whether the effect of treatments lasts over time, immunofluorescence intensity is measured at multiple time points (i.e. 2 hours, 8 hours, 24 hours and 72 hours), via microscopic imaging. The rationale for Aim 1 experiments is to compare the global DNA methylation level between the control group and treatment groups across time. As for extracellular stretching (Aim 2), the analysis compares the DNA methylation level of the control group and the two treatment groups that experienced different levels of stretching.
+
+Methods describe our considerations behind choosing statistical tests to perform. The Results section reports the statistical test results followed by the Discussion section that discusses limitations and alternative considerations for this analysis. Finally, the Conclusion section concludes the findings and summarizes the implications of the analysis.
+
+
+```{r aim 1 data load and clean, message=FALSE, warning=FALSE, include=FALSE}
+aim_1_dat <- read_excel("Aim1_trap6lpa_normall.xlsx")
+
+# drop the annotation columns
+aim_1_dat <- aim_1_dat %>% dplyr::select(!10:12)
+
+# splitting TRAP-6 and LPA data
+trap6_dat <- aim_1_dat %>% dplyr::select(1:5)
+
+lpa_dat <- aim_1_dat %>% dplyr::select(c(1, 6:9))
+```
+
+```{r trap-6 clean, include=FALSE}
+# TRAP-6 data in tidy form by pivoting
+trap6_dat <- trap6_dat %>% pivot_longer(names(trap6_dat), 
+                                      names_to = "treatment", 
+                                      values_to = "intensity")
+
+# drop all NA intensities
+trap6_dat <- na.omit(trap6_dat)
+
+# re-level treatment groups in chronological order
+trap6_dat$treatment <- factor(trap6_dat$treatment,
+                             levels = c("Control", "TRAP6 2 hr", "TRAP6 8 hr", "TRAP6 24 hr", "TRAP6 3 days"))
+
+# rename hr to hours
+levels(trap6_dat$treatment)[levels(trap6_dat$treatment)=="TRAP6 2 hr"] <- "TRAP-6 2 hours"
+levels(trap6_dat$treatment)[levels(trap6_dat$treatment)=="TRAP6 8 hr"] <- "TRAP-6 8 hours"
+levels(trap6_dat$treatment)[levels(trap6_dat$treatment)=="TRAP6 24 hr"] <- "TRAP-6 24 hours"
+levels(trap6_dat$treatment)[levels(trap6_dat$treatment)=="TRAP6 3 days"] <- "TRAP-6 3 days"
+# str(trap6_dat)
+```
+
+```{r lpa clean, include=FALSE}
+# LPA tidy data in form by pivoting
+lpa_dat <- lpa_dat %>% pivot_longer(names(lpa_dat), 
+                                      names_to = "treatment", 
+                                      values_to = "intensity")
+
+# drop all NA intensities
+lpa_dat <- na.omit(lpa_dat)
+
+# re-level treatment groups in chronological order
+lpa_dat$treatment <- factor(lpa_dat$treatment,
+                             levels = c("Control", "LPA 2 hr", "LPA 8 hr", "LPA 24 hr", "LPA 3 days"))
+
+# rename hr to hours
+levels(lpa_dat$treatment)[levels(lpa_dat$treatment)=="LPA 2 hr"] <- "LPA 2 hours"
+levels(lpa_dat$treatment)[levels(lpa_dat$treatment)=="LPA 8 hr"] <- "LPA 8 hours"
+levels(lpa_dat$treatment)[levels(lpa_dat$treatment)=="LPA 24 hr"] <- "LPA 24 hours"
+# str(lpa_dat)
+```
+
+```{r aim 2 data load and clean, include=FALSE}
+cell_stretch <- read_excel("Aim2_Stretch_normall.xlsx")
+
+# cell_stretch data in form by pivoting
+cell_stretch_dat <- cell_stretch %>% pivot_longer(names(cell_stretch), 
+                                                  names_to = "treatment", 
+                                                  values_to = "intensity")
+
+# drop all NA intensities
+cell_stretch_dat <- na.omit(cell_stretch_dat)
+
+# re-order treatment groups by level of stretching
+cell_stretch_dat$treatment <- factor(cell_stretch_dat$treatment,
+                                     levels = c("Control", "Min Stretch", "Max Stretch"))
+
+# rename factor levels
+levels(cell_stretch_dat$treatment)[levels(cell_stretch_dat$treatment)=="Min Stretch"] <- "Minimum Stretch"
+levels(cell_stretch_dat$treatment)[levels(cell_stretch_dat$treatment)=="Max Stretch"] <- "Maximum Stretch"
+``` 
+
+
+\newpage
+
+# Methods
+
+Upon receiving the experiment data, we first checked for missing values. All missing values are dropped since they only come from two sources: (1) outliers identified and removed by our collaborator (2) non-available records after data transformation due to the unequal length in each treatment group. In both cases, dropping them is sufficient and efficient.
+
+At a glance, we noticed that the column headers are not names of variables, but *values* of the treatment condition. We transformed the data by (1) moving each column header to the treatment variable (2) moving the values in each column to the intensity variable. At the end of the transformation, the *cleaned* data has two columns: treatment and intensity, with values from the original data.
+
+Another change to the data is that we pooled data by "ignoring" the repeats, for two reasons (1) repeats were independent and designed to include more sample records in case cell death and contamination happen (2) the original data files use colour-coding to distinguish the repeats, which disappears after data is loaded in R. Separating the repeats is cumbersome and makes the data cleaning process less reproducible.
+
+The research rationale is to compare the global DNA methylation level across all MSC groups to study whether applied mechanical stressors have a treatment effect on the cells, which helps unveil the underlying mechanism regulating cells' DNA methylation pattern. 
+
+The **response variable** 5mc intensity readings have been scaled, known as "normalized to control". That is, all the raw 5mc immunofluorescence intensity values are divided by the corresponding control average for each condition. Post normalization, the intensity values are on the same scale and retain their proportional distribution. As a consequence, any changes in the fluorescence are displayed as deviations from unity. No unit is associated with intensity readings, we are comparing and interpreting it in a relative manner.
+
+We think of using one-way ANOVA to address the research question since it tests whether the mean DNA methylation level for all cell groups is the same or at least one cell group has a different mean DNA methylation level with statistical significance. 
+
+For all five treatment groups in the Aim 1 (TRAP-6 and LPA) experiments, we are testing $H_0: \mu_1 = \mu_2 = \mu_3 = \mu_4 = \mu_5$ versus $H_A: \text{at least one of } \mu_1, \mu_2, \mu_3, \mu_4, \mu_5$ differs from others. 
+
+\newpage
+
+## Aim 1 Method: Welch's ANOVA and post-hoc Dunnett's T3 test
+
+However, data from the Aim 1 experiments violate the classic ANOVA assumptions (they are listed in **Appendix**). One of them is the homogeneity of group variances. Despite efforts to obtain enough samples for all treatments by pooling all three repeats in Aim 1 experiments, variances are notably unequal across the treatment groups possibly due to the *unequal sample size*. For the cell groups treated with TRAP-6, the ratio of the maximum within-group variance to the minimum within-group variance is astonishingly high (`r signif(4.4401349/0.0244456)`). Data from the LPA experiments show a similar feature, where the ratio of maximum variance to minimum variance is (`r signif(0.5770985/0.0244456)`). Looking at Table 1, there seems to be a *positive pairing* between sample sizes and variances in Aim 1 data. That is, groups with a larger sample size tend to have larger within-group variance.
+
+```{r aim1 unequal variance summary table}
+# bartlett.test/Levene for for homogeneity of variance
+# If Levene’s test is statistically significant, this means that your variances are different
+trap6_sample_summary <- trap6_dat %>% group_by(treatment) %>% 
+  summarise("Sample Size" = n(), "Mean" = mean(intensity), "Variance" = var(intensity))
+names(trap6_sample_summary)[names(trap6_sample_summary) == 'treatment'] <- 'Treatment'
+
+lpa_sample_summary <- lpa_dat %>% filter(treatment!="Control") %>% group_by(treatment) %>% 
+  summarise("Sample Size" = n(), "Mean" = mean(intensity), "Variance" = var(intensity))
+names(lpa_sample_summary)[names(lpa_sample_summary) == 'treatment'] <- 'Treatment'
+
+# non-normal, unequal n, hetero-variance
+aim1_var_table <- kbl(rbind(trap6_sample_summary,lpa_sample_summary), 
+                      booktabs = T,
+                      digits = 4,
+                      caption = "Summary Statistics from Aim 1 Experiments") %>%
+  kable_styling(latex_options = "HOLD_position") %>% 
+  add_footnote("Aim 1 experiments refer to the same control group", notation = "symbol")
+aim1_var_table
+# latex options = "hold_position"
+#kableExtra::add_footnote(aim1_var_table, "Aim 1 experiments refer to the same control group", notation = "symbol")
+```
+
+The classic one-way ANOVA test is more impacted by unequal variances when comparing more than two groups and the sample sizes are unequal. To remediate issues in Aim 1 data, we choose to perform the **Welch's one-way ANOVA test**, since it is robust to unequal variances and sample sizes while maintaining a nearly equivalent statistical power to the classic ANOVA test ([\textcolor{blue} {Delacre et al.}](https://rips-irsp.com/articles/10.5334/irsp.198#statistical-power-for-the-f-test-w-test-and-f-test)).
+
+ANOVA tests can detect whether a significant difference in means exists, yet fail to identify which pair of the treatment groups has the difference. To get more informative results for answering the research question, if the ANOVA result is significant at the 5% level **and** agrees with graphical observations (from **Relevant Plots**), we then conduct a **post-hoc Dunnett's T3 test** that performs all-possible pairwise comparisons. For each pair, the Dunnett's T3 test evaluates null hypothesis $H_0: \mu_{i}=\mu_0$ against the alternative $H_A: \mu_{i}\ne\mu_0$, where $0$ denotes the control group, $i$ indexes the treatment groups.
+
+Categorizing the pairwise comparisons for Aim 1 experiments into two types:
+
+1. Comparisons between each treatment group and the control group are to identify if the treatment effect (still) exists.
+
+2. Comparing treatment groups with each other (i.e. between different time points) helps detect the effect strength over time.
+
+## Aim 2 Method: Classic ANOVA and post-hoc one-sided Dunnett's test
+
+Data from Aim 2 experiments are easier to handle compared with Aim 1. Table 2 shows that the within-group variances are quite homogeneous, with the ratio of maximum variance to minimum variance smaller than four (`r signif(0.2499535/0.1270599)`). We then choose the classic one-way ANOVA to test for null hypothesis $H_0: \mu_1 = \mu_2 = \mu_3$ against the alternative hypothesis $H_A: \text{at least one of } \mu_1, \mu_2, \mu_3$ differs from others.
+
+```{r aim2 homo-variance summary table}
+# non-normal, unequal n, homo-variance
+aim2_sample_summary <- cell_stretch_dat %>% group_by(treatment) %>% 
+  summarise("Sample Size" = n(), "Mean" = mean(intensity), "Variance" = var(intensity))
+names(aim2_sample_summary)[names(aim2_sample_summary) == 'treatment'] <- 'Treatment'
+
+#aim2_var_table <- aim2_sample_summary %>% knitr::kable(caption = "Summary Statistics from #Aim 2 Experiments")
+#
+#aim2_var_table
+
+aim2_var_table <- kbl(aim2_sample_summary, 
+                      booktabs = T,
+                      digits = 4,
+                      caption = "Summary Statistics from Aim 2 Experiments") %>%
+  kable_styling(latex_options = "HOLD_position")
+aim2_var_table
+
+# LeveneTest(cell_stretch_dat$intensity, cell_stretch_dat$treatment)
+# p-value < 0.05, fails to reject that variances are equal
+```
+
+Like our method for Aim 1, if the ANOVA test is significant at the 5% level, then we perform **post-hoc** tests to uncover specific differences between the three group means in Aim 2. Given the experimental design, we choose a **one-sided (Tamhane-)Dunnett’s test**  that performs many-to-one comparisons between every treatment group and the corresponding control group. For each condition in Aim 2, the one-sided Dunnett’s test considers null hypothesis $H_0: \mu_{i}=\mu_0$ against the alternative $H_A: \mu_{i}>\mu_0$, where $0$ denotes the control group, $i$ indexes the treatment groups. We choose the one-sided testing based on the research hypothesis that stretching will lead to an enhanced DNA methylation level in MSCs. Dunnett’s test can tell how the treatment effect differs between cells that experienced minimum stretch and those that got maximum stretch.
+
+As the number of comparisons increases, the more likely our inferences can go wrong. We need to make the statistical tests less tolerant to account for problems with multiple testing (e.g. inflation of the **false positive** rate). By experimental design, it is reasonable for us to assume that all treatment groups are independent. For observations across time, the biggest point of concern is temporal correlations. But our experiment data is collected from different groups of cells rather than following up the same batch of cells, suggesting that we can assume statistical independence. The independence of comparisons allows both post-hoc tests to control for the probability of getting at least one false positive result. By convention, we set the 5% significance level beforehand, and comparing the adjusted p-values from the post-hoc tests to show whether a significant difference exists or not.
+
+Thus the final analysis performs Welch's one-way ANOVA test with a post-hoc Dunnett's T3 test for Aim 1 data. Data from Aim 2 is tested by the classic one-way ANOVA test, followed by a post-hoc one-sided Dunnett's test if the former has a significant result.
+
+Our test results to be presented below in **Results** come with (statistical) caveats that are fully addressed in **Discussion**. 
+
+# Results 
+
+## Aim 1: TRAP-6 acts stronger, yet LPA lasts longer
+
+```{r aim 1 tests, include=FALSE}
+# TRAP-6 Welch's ANOVA  
+trap6_anova <- oneway.test(intensity ~ treatment, data = trap6_dat, var.equal = FALSE)
+#trap6_anova #"statistic" "parameter" "p.value" 
+
+
+# ?note: threshold for Aim 1 comparisons is 0.0125
+set.seed(490)
+# TRAP-6 post-hoc 
+trap6_dunnettT3 <- dunnettT3Test(trap6_dat$intensity, trap6_dat$treatment)
+
+trap6_dunnettT3_est <- tibble(comp = c("TRAP-6 2 hours - Control",
+                                       "TRAP-6 8 hours - Control",
+                                       "TRAP-6 24 hours - Control",
+                                       "TRAP-6 3 days - Control",
+                                       "TRAP-6 8 hours - TRAP-6 2 hours",
+                                       "TRAP-6 24 hours - TRAP-6 8 hours",
+                                       "TRAP-6 3 days - TRAP-6 24 hours"),
+                               tstat = c(10.541, 6.806, 8.054, 0.842,
+                                         -4.413, -1.582, -7.740),
+                               adj_pval = c(0, 9.9008e-08, 1.0700e-10, 0.9935,
+                                            0.0002, 0.7000, 1.7413e-07))
+
+# LPA Welch's ANOVA 
+lpa_anova <- oneway.test(intensity ~ treatment, data = lpa_dat, var.equal = FALSE)
+#lpa_anova
+
+# LPA post-hoc
+# ?note: threshold for Aim 1 comparisons is 0.0125
+lpa_dunnettT3 <- dunnettT3Test(lpa_dat$intensity, lpa_dat$treatment)
+
+lpa_dunnettT3_est <- tibble(comp = c("LPA 2 hours - Control", 
+                                     "LPA 8 hours - Control",
+                                     "LPA 24 hours - Control",
+                                     "LPA 3 days - Control",
+                                     "LPA 8 hours - LPA 2 hours",
+                                     "LPA 24 hours - LPA 8 hours",
+                                     "LPA 3 days - LPA 24 hours"),
+                            tstat = c(7.703, 3.043, 4.710, 3.321,
+                                      -4.666, 2.827, -2.294),
+                            adj_pval = c(5.0787e-11, 0.0405, 0.0002, 0.0182,
+                                         7.5277e-05, 0.0573, 0.2132))
+
+```
+
+Aim 1 uses two types of cell contraction agonists: TRAP-6 and LPA, to induce mechanical stress on the MSCs. The Welch's ANOVA test shows that there is a statistically significant difference in average DNA methylation levels across the five cell groups for both MSCs treated with the TRAP-6 agent ($F=$ `r trap6_anova$statistic %>% as.numeric() %>% signif(4)`, $p=$ `r signif(trap6_anova$p.value, 4)`) and LPA agent ($F=$ `r lpa_anova$statistic %>% as.numeric() %>% signif(4)`, $p=$ `r signif(lpa_anova$p.value, 4)`). 
+
+There is a downward trend in DNA methylation levels over time. Based on the post-hoc Dunnett's T3 test, the effect of the TRAP-6 on DNA methylation lasts for at least 24 hours ($t\approx8.054$, $p\approx1.0700\times10^{-10}$), but not up to 3 days ($t\approx0.842$, $p\approx0.9935$). In comparison, LPA has a longer-lasting effect on MSCs' average DNA methylation level up to 3 days ($t\approx3.321$, $p\approx0.0182$). This is in line with expectations that the treatment effects of the chemical agents wear out as time goes by.
+
+Focusing on the TRAP-6 pairwise comparisons, we may deduce that the "turning point" of TRAP-6's treatment effect on MSCs' DNA methylation level happens at 8 hours. Dunnett's T3 test shows a significant decrease in mean DNA methylation level between 2 hours and 8 hours ($t\approx-4.413$, $p\approx0.0002$). Yet in the next time interval (8 hours to 24 hours), the drop in DNA methylation level is no longer significant ($t\approx-1.582$, $p\approx0.7000$).
+
+The treatment effect of LPA, on the other hand, demonstrates a different pattern. The DNA methylation level decreases significantly between 2 hours and 8 hours after the treatment ($t\approx-4.666$, $p\approx7.5277\times10^{-5}$), but plateaus in magnitude and shows insignificant fluctuations. There is an increase in DNA methylation from 8 hours to 24 hours ($t\approx2.827$, $p\approx0.0573$) but falls after that ($t\approx-2.294$, $p\approx0.2132$).
+
+TRAP-6 induces the largest increase in DNA methylation level in absolute terms (after 2 hours $t\approx10.541$, $p\approx0$), yet LPA has a more sustaining impact on MSCs’ DNA methylation level (up to 3 days, $t\approx3.321$, $p\approx0.0182$).
+
+```{r aim 1 result table}
+aim1_dunnettT3_est <- rbind(trap6_dunnettT3_est, lpa_dunnettT3_est)
+
+aim1_res_table <- kbl(aim1_dunnettT3_est, 
+                      col.names = c("Comparison", "Test Statistic", "Adjusted p-value"),
+                      #format.args = list(scientific = FALSE),
+                      digits = 4,
+                      caption = "Pairwise Comparisons of Aim 1 Experiment",
+                      booktabs = T) %>% kable_styling(latex_options = "HOLD_position") %>%
+  add_footnote("From the Dunnett's T3 two-sided test for multiple comparisons with unequal variances", notation = "symbol")
+aim1_res_table
+```
+
+```{r aim 1 result viz, warning=FALSE}
+trap6_res_plot <- ggplot(data=trap6_dat) +
+    geom_boxplot(mapping = aes(x = treatment, y = intensity, 
+                               fill = treatment, middle = mean(intensity)), 
+                 alpha=0.7) +
+    theme(legend.position="none") +
+    scale_fill_brewer(palette="Set1") + coord_flip()
+
+trap6_res_plot <- trap6_res_plot + 
+  labs(x = "Treatment Groups", 
+       y = "5mc Intensity",
+       caption = "Figure 1A: Effect of TRAP-6 on DNA Methylation")
+
+lpa_res_plot <- ggplot(data=lpa_dat) +
+    geom_boxplot(mapping = aes(x = treatment, y = intensity, 
+                               fill = treatment, middle = mean(intensity)), 
+                 alpha=0.7) +
+    theme(legend.position="none") +
+    scale_fill_brewer(palette="Set1") + coord_flip()
+
+lpa_res_plot <- lpa_res_plot + 
+  labs(x = "Treatment Groups", 
+       y = "5mc Intensity",
+       caption = "Figure 1B: Effect of TRAP-6 on DNA Methylation")
+
+ggarrange(trap6_res_plot, lpa_res_plot, ncol = 1, nrow = 2) %>%
+  annotate_figure(bottom = text_grob("Vertical bar in the middle marks group means.",
+                                     hjust = 1, x = 1, face = "italic", size = 10))
+```
+
+\newpage
+
+## Aim 2: Stretching breaks 
+
+Aim 2 investigates the effect of extracellular stretching on MSCs' DNA methylation level. Stretching exerts extra mechanical stress onto the cell and pulls chromatin further apart, both of which are believed to physically facilitate the increase in DNA methylation level. The one-way ANOVA test statistically verifies that there is a significant difference in average DNA methylation levels across the three groups ($F_{2, 146}\approx5.417$, $p\approx0.005376$).
+
+However, the one-sided Dunnett's test shows that there is **no statistically significant increase** in DNA methylation level when comparing the cells from the control group versus the cells that experienced stretches. Figure 2 also confirms that the mean DNA methylation level of the cells that experienced minimum stretch is notably lower than the control group of cells. Cells that were stretched at the maximum have a higher DNA methylation level, yet still lower than the control group. This unexpected result may be due to a detachment issue between the cells and the membrane. 
+
+```{r aim 2 tests}
+# stretching ANOVA
+stretch_anova <- oneway.test(intensity ~ treatment, data = cell_stretch_dat, var.equal = T)
+#stretch_anova
+
+set.seed(490)
+# stretching post-hoc
+# ONE SIDED FOR VERIFYING INCREASE
+# note: new threshold for Aim 2 is 0.025?
+stretch_dunnett <- tamhaneDunnettTest(cell_stretch_dat$intensity, 
+                                      cell_stretch_dat$treatment, 
+                                      alternative = "greater")
+
+stretch_dunnett_est <- tibble(hyp = c("Minimum Stretch - Control", 
+                                      "Maximum Stretch - Control"),
+                              tstat = signif(stretch_dunnett$statistic, 4),
+                              df = stretch_dunnett$df,
+                              adj_pval = signif(stretch_dunnett$p.value, 4))
+```
+
+```{r aim 2 result table}
+aim2_res_table <- kbl(stretch_dunnett_est, 
+                      col.names = c("Comparison", "Test Statistic", 
+                                    "Degrees of Freedom", "Adjusted p-value"),
+                      #format.args = list(scientific = FALSE),
+                      digits = 4,
+                      caption = "Pairwise Comparisons of Aim 2 Experiment",
+                      booktabs = T) %>% kable_styling(latex_options = "HOLD_position") %>% add_footnote("From the Tamhane-Dunnett's one-sided test for multiple comparisons with one control", notation = "symbol")
+aim2_res_table
+```
+
+```{r aim 2 result viz}
+stretch_plot <- ggplot(data=cell_stretch_dat) +
+    geom_boxplot(mapping = aes(x = treatment, y = intensity, 
+                               fill = treatment, middle = mean(intensity)), 
+                 alpha=0.7) +
+    theme(legend.position="none") +
+    scale_fill_brewer(palette="Set1") + 
+  labs(x = "Treatment Groups", 
+       y = "5mc Intensity",
+       caption = "Figure 2: Effect of Extracellular Stretching on DNA Methylation")
+
+annotate_figure(stretch_plot,
+                bottom = text_grob("Vertical bar in the middle marks group means.", 
+                                   hjust = 1, x = 1, face = "italic", size = 10))
+
+```
+
+
+# Discussion
+
+The impact of cell contraction agonists is in line with previous literature findings as well as the research hypothesis, yet analysis of Aim 2 data shows that the effect of stretching is not. In either case, the statistical significance of the inferences needs cautious interpretation due to data anomalies.
+
+## Statistical Caveats
+
+Two main statistical assumptions violated by the experiment data are unequal variance (Aim 1) and non-normality (both Aim 1 and 2). By a preliminary literature review, the heterogeneous variance is more relevant to how trustworthy the inference is. On the other hand, the prevalent non-normality is concerning, yet does not hurt the inference validity as much ([\textcolor{blue} {Delacre et al.}](https://rips-irsp.com/articles/10.5334/irsp.198#statistical-power-for-the-f-test-w-test-and-f-test)).
+
+A common visual tool to check data normality is the Normal Quantile-Quantile plot of the sample quantile against the theoretical Normal quantiles. If the two quantiles agree well, then we may conclude that the data is close to being normally distributed. However, notable deviations can be seen from the below Normal Q-Q plots.
+
+The tail deviations may be attributable to (1) measurement errors due to instrumental sensitivity and/or imaging algorithm during data collection (2) scaling and truncation during data pre-processing. Yet the data anomalies of the stretching groups, for example, cannot be fully explained by these two sources.
+
+```{r bimodal LPA and stretch qqplot}
+qqnorm_dat <- rbind(lpa_dat %>% filter(treatment!="Control"),
+                    cell_stretch_dat %>% filter(treatment!="Control"))
+
+non_qqnorm <- qqnorm_dat %>% 
+  ggplot(aes(sample=intensity)) +
+  geom_qq() + 
+  geom_qq_line(color="red") + 
+  xlab("Theoretical") +
+  ylab("Sample") +
+  facet_wrap(~treatment) +  
+  labs(caption = "Figure 3: Deviating Normal QQ-plots")
+
+non_qqnorm
+```
+
+Normality assumption appears in both ANOVA and the two post-hoc tests. Luckily, non-normality has little impact on ANOVA test results and does not interact with the unequal variances ([\textcolor{blue} {Delacre et al.}](https://rips-irsp.com/articles/10.5334/irsp.198#statistical-power-for-the-f-test-w-test-and-f-test)). The post-hoc Dunnett's (T3) tests still maintain adequate control of the false positive rate when assumptions are not met (Table 1, [\textcolor{blue} {Sauder and DeMars}](https://journals.sagepub.com/doi/full/10.1177/2515245918808784#sec-3)).
+
+Instead of imposing distributional assumptions on our data, we may switch to statistical tests that relax such assumptions. For example, the Kruskal-Wallis test is the non-parametric equivalent of ANOVA. However, it has its own drawbacks. Parametric tests usually have more statistical power than the non-parametric ones. In other words, parametric test is more likely to detect significant differences when they truly exist. More importantly, it is very hard to test differences in medians non-parametrically if not assuming that the distributions in each group are identical except for a change in location. However, treatment effects are likely to not only manifest in a location shift but also influence the distribution shape ([\textcolor{blue} {Delacre et al.}](https://rips-irsp.com/articles/10.5334/irsp.198#statistical-power-for-the-f-test-w-test-and-f-test)). We are reluctant to make such a premature assumption to address the non-normality which is not as threatening to the inference as the unequal variances.
+
+Unequal variances and the positive pairing between sample size and within-group variance in Aim 1 data, as highlighted in Table 1 are the most notable concerns. In our case of a possible positive pairing, the Welch’s ANOVA test may be too conservative to infer a statistical significance difference ([\textcolor{blue} {Delacre et al.}](https://rips-irsp.com/articles/10.5334/irsp.198#statistical-power-for-the-f-test-w-test-and-f-test)). Using the data we have access to, Welch’s ANOVA is an optimal option for its robustness to unequal variances. The same applies for the post-hoc Dunnett's T3 test for multiple comparisons with unequal variances. Its downside is testing all possible pairs (as shown in Table 5), yet not every comparison has a meaningful interpretation necessarily.
+
+# Conclusion
+
+To conclude, our statistical analysis shows some *in-vitro* evidence that the mechanical stressors used in the experiment have an impact on MSCs' DNA methylation level. For the Aim 1 experiments, comparisons show that both TRAP-6 and LPA lead to an enhanced level of cell DNA methylation up to 24 hours and 3 days, respectively. TRAP-6 shows a greater effect while LPA has a longer-lasting effect. On the other hand, the experimental outcome from Aim 2 does not match the literature findings ([\textcolor{blue} {Cakouros and Gronthos}](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7532954/)). The level of DNA methylation in the MSCs decreases compared to the control group. We suspect that the unexpected results are due to detachment between the cells and the stretching membrane. Inference from the statistical tests matches the graphical observations, yet caveats need to be kept in mind. 
+
+## Future Directions
+
+After all, we want to have informative experiment data to analyze and answer the research question. We have two "streams" for future directions. When pre-processing the current data, our collaborator identified and removed outliers that surpass an unknown threshold (i.e. truncation). There are biometric modelling methods for truncated data (e.g. Tobit model) and methods to analyze non-random missingness, given that we can have more information about how the truncation happened. As mentioned in **Discussion**, we tend to avoid making distributional assumptions in our statistical analysis. If there are biological theories to support that the treatment effects only lead to a location change in data distributions, non-parametric tests can be a suitable alternative method of analysis for the current data.
+
+For the validity of statistical inference results, the unequal sample sizes and within-group variances are more concerning. To be better at collecting more useful information, our collaborator shall also consider conducting future experiments on a larger sample size along with improving the experimental design. The "golden standard" of experimental design is a randomized control trial (RCT). Another experimental design that can be considered is the randomized block design so that our collaborator can keep track of some nuisance factors other than the primary factor of interest. For example, we may want to match the MSCs based on the rats' age and sex. 
+
+\newpage
+
+# Appendix
+
+## Data Cleaning Overview
+
+1. To facilitate further analysis and simplify the cleaning steps, pooled the data from all three repeats. 
+2. Dropped columns that contain data descriptions and other comments.
+3. Re-structured data since the headers in the experiment data table are values of the treatment, but not variable names. After transformation, each row corresponds to one MSC's 5mc intensity reading from one treatment group.
+4. Missing values in the data records are outliers identified and removed by our collaborator. Thus we dropped all "NA" intensity values.
+
+For data from Aim 1:
+
+1. Sorted the treatment groups in chronological order.
+2. Renamed treatment conditions. For example, "TRAP6 2 hr" is renamed as "TRAP6 2 hours" which is more informative.
+
+For data from Aim 2: 
+
+1. Re-ordered the treatment groups in level of stretching.
+2. Renamed factor levels. For example, "Min Stretch" is renamed as "Minimum Stretch" which is more informative.
+
+## Relevant Plots
+
+```{r trap-6 distribution pre and post log transform, message=FALSE}
+trap6_boxplot <- trap6_dat %>% 
+  ggplot( aes(x=treatment, y=intensity, fill=treatment) ) +
+    geom_boxplot() +
+    stat_summary(fun=mean, geom="point", shape=20, size=5, color="red", fill="red") +
+    theme(legend.position="none") +
+    scale_fill_brewer(palette="Set1") + coord_flip()
+
+trap6_boxplot <- trap6_boxplot + 
+  labs(x = "Treatment Groups", 
+       y = "5mc Intensity",
+       caption = "Figure A1a: Effect of TRAP-6 on DNA Methylation for all groups")
+
+trap6_boxplot %>% annotate_figure(bottom = text_grob("Red dot marks group means.", 
+                                   hjust = 1, x = 1, face = "italic", size = 10))
+
+# normal qq by group
+trap6_qqnorm <- trap6_dat %>% filter(treatment!="Control") %>% ggplot(aes(sample=intensity)) +
+  geom_qq() + 
+  geom_qq_line(color="red") + 
+  xlab("Theoretical") +
+  ylab("Sample") + labs(caption = "Figure A1b: Normal Q-Q Plot of TRAP-6 Experiments") +
+  facet_wrap(~treatment)
+trap6_qqnorm 
+# filter non-control groups, then to display histogram and qqnorm
+
+## take natural logarithmic transformation
+## add log intensity to data table
+#trap6_dat <- trap6_dat %>% mutate(log_intensity = log(intensity))
+#
+## plot histogram by treatment group
+#trap6_dat %>% filter(treatment != "Control") %>% 
+#  ggplot( aes(x=log_intensity, color=treatment) ) +
+#    geom_histogram(alpha=0.6) + facet_wrap(~treatment)
+##  facet_wrap(vars(treatment), nrow = 2)
+#
+## qqplot by group
+#ggplot(data = trap6_dat, aes(sample=log_intensity)) +
+#  geom_qq() + 
+#  geom_qq_line(color="red") + 
+#  xlab("Theoretical") +
+#  ylab("Sample") +
+#  facet_wrap(~treatment)
+#
+## post log transformation, normality test by group
+#shapiro.test(trap6_dat[trap6_dat$treatment == "Control", ]$log_intensity) 
+#shapiro.test(trap6_dat[trap6_dat$treatment == "TRAP-6 2 hours", ]$log_intensity) 
+#shapiro.test(trap6_dat[trap6_dat$treatment == "TRAP-6 8 hours", ]$log_intensity) 
+#shapiro.test(trap6_dat[trap6_dat$treatment == "TRAP-6 24 hours", ]$log_intensity) 
+#shapiro.test(trap6_dat[trap6_dat$treatment == "TRAP-6 3 days", ]$log_intensity) 
+```
+
+```{r lpa distribution pre and post log transform, message=FALSE}
+lpa_boxplot <- lpa_dat %>% 
+  ggplot( aes(x=treatment, y=intensity, fill=treatment) ) +
+    geom_boxplot() +
+    stat_summary(fun=mean, geom="point", shape=20, size=5, color="red", fill="red") +
+    theme(legend.position="none") +
+    scale_fill_brewer(palette="Set1") + coord_flip()
+
+lpa_boxplot <- lpa_boxplot + 
+  labs(x = "Treatment Groups", 
+       y = "5mc Intensity",
+       caption = "Figure A2a: Effect of LPA on DNA Methylation for all groups")
+
+lpa_boxplot %>% annotate_figure(bottom = text_grob("Red dot marks group means.", 
+                                   hjust = 1, x = 1, face = "italic", size = 10))
+
+# normal qq by group
+lpa_qqnorm <- lpa_dat %>% filter(treatment!="Control") %>% 
+  ggplot(aes(sample=intensity)) +
+  geom_qq() + 
+  geom_qq_line(color="red") + 
+  xlab("Theoretical") +
+  ylab("Sample") + labs(caption = "Figure A2b: Normal Q-Q Plot of LPA Experiments") +
+  facet_wrap(~treatment)
+lpa_qqnorm
+
+## take natural logarithmic transformation
+## add log intensity to data table
+#lpa_dat <- lpa_dat %>% mutate(log_intensity = log(intensity))
+#
+## plot histogram by group
+#lpa_dat %>% filter(treatment != "Control") %>% 
+#  ggplot( aes(x=log_intensity, color=treatment) ) +
+#    geom_histogram(alpha=0.6) + facet_wrap(~treatment)
+#
+## qqplot by group
+#ggplot(data = lpa_dat, aes(sample=log_intensity)) +
+#  geom_qq() + 
+#  geom_qq_line(color="red") + 
+#  xlab("Theoretical") +
+#  ylab("Sample") +
+#  facet_wrap(~treatment)
+#
+#shapiro.test(lpa_dat[lpa_dat$treatment == "Control", ]$log_intensity) 
+# bx_lpa <- BoxCox(lpa_dat[lpa_dat$treatment == "LPA 2 hours", ]$intensity, lambda = BoxCoxLambda(lpa_dat[lpa_dat$treatment == "LPA 2 hours", ]$intensity) )
+#shapiro.test(bx_lpa) 
+#shapiro.test(lpa_dat[lpa_dat$treatment == "LPA 8 hours", ]$log_intensity) 
+#shapiro.test(lpa_dat[lpa_dat$treatment == "LPA 24 hours", ]$log_intensity) 
+#shapiro.test(lpa_dat[lpa_dat$treatment == "LPA 3 days", ]$log_intensity) 
+```
+
+```{r stretch distribution pre and post log transform, message=FALSE}
+stretch_boxplot <- cell_stretch_dat %>% 
+  ggplot( aes(x=treatment, y=intensity, fill=treatment) ) +
+    geom_boxplot() +
+    stat_summary(fun=mean, geom="point", shape=20, size=5, color="red", fill="red") +
+    theme(legend.position="none") +
+    scale_fill_brewer(palette="Set1") + coord_flip()
+
+stretch_boxplot <- stretch_boxplot + 
+  labs(x = "Treatment Groups", 
+       y = "5mc Intensity",
+       caption = "Figure A3a: Effect of Stretching on DNA Methylation for all groups")
+
+stretch_boxplot %>% annotate_figure(bottom = text_grob("Red dot marks group means.", 
+                                   hjust = 1, x = 1, face = "italic", size = 10))
+
+# normal qq by group
+stretch_qqnorm <- cell_stretch_dat %>% filter(treatment!="Control") %>% 
+  ggplot(aes(sample=intensity)) +
+  geom_qq() + 
+  geom_qq_line(color="red") + 
+  xlab("Theoretical") +
+  ylab("Sample") + labs(caption = "Figure A3b: Normal Q-Q Plot of Strethcing Experiments") +
+  facet_wrap(~treatment)
+stretch_qqnorm
+
+## take natural logarithmic transformation
+## add log intensity to data table
+#lpa_dat <- lpa_dat %>% mutate(log_intensity = log(intensity))
+#
+## plot histogram by group
+#lpa_dat %>%
+#  ggplot( aes(x=log_intensity, color=treatment) ) +
+#    geom_histogram(alpha=0.6) + facet_wrap(~treatment)
+#
+## qqplot by group
+#ggplot(data = lpa_dat, aes(sample=log_intensity)) +
+#  geom_qq() + 
+#  geom_qq_line(color="red") + 
+#  xlab("Theoretical") +
+#  ylab("Sample") +
+#  facet_wrap(~treatment)
+#
+#shapiro.test(lpa_dat[lpa_dat$treatment == "Control", ]$log_intensity) 
+#shapiro.test(lpa_dat[lpa_dat$treatment == "LPA 2 hours", ]$log_intensity) 
+#shapiro.test(lpa_dat[lpa_dat$treatment == "LPA 8 hours", ]$log_intensity) 
+#shapiro.test(lpa_dat[lpa_dat$treatment == "LPA 24 hours", ]$log_intensity) 
+#shapiro.test(lpa_dat[lpa_dat$treatment == "LPA 3 days", ]$log_intensity) 
+```
+
+## Classic ANOVA Assumptions
+
+1. The data are continuous.
+2. The data are normally distributed (in each group).
+3. Each group is a simple random sample from its population. Each individual in the population has an equal
+probability of being selected in the sample.
+4. The variances for the groups are equal. If the ratio of maximum within group variance estimate to the minimum within group variance is smaller than three, classic ANOVA is robust to heterogeneity of variance.
+
+## Full Test Results
+
+```{r aim1 test res full}
+trap6_dunnettT3_est_full <- tibble(comp = c("TRAP-6 2 hours - Control", 
+                                      "TRAP-6 8 hours - Control",
+                                      "TRAP-6 24 hours - Control",
+                                      "TRAP-6 3 days - Control",
+                                      "TRAP-6 8 hours - TRAP-6 2 hours",
+                                      "TRAP-6 24 hours - TRAP-6 2 hours",
+                                      "TRAP-6 3 days - TRAP-6 2 hours",
+                                      "TRAP-6 24 hours - TRAP-6 8 hours",
+                                      "TRAP-6 3 days - TRAP-6 8 hours",
+                                      "TRAP-6 3 days - TRAP-6 24 hours"),
+                              tstat = c(10.541, 6.806, 8.054, 0.842, 
+                                        -4.413, -6.258, -10.412, -1.582,
+                                        -6.637, -7.740),
+                              adj_pval = c(0, 9.9008e-08, 1.0700e-10, 0.9935,
+                                           0.0002, 5.1910e-08, 0, 0.7000,
+                                           1.7413e-07, 5.1488e-10))
+
+lpa_dunnettT3_est_full <- tibble(comp = c("LPA 2 hours - Control", 
+                                     "LPA 8 hours - Control",
+                                     "LPA 24 hours - Control",
+                                     "LPA 3 days - Control",
+                                     "LPA 8 hours - LPA 2 hours",
+                                     "LPA 24 hours - LPA 2 hours",
+                                     "LPA 3 days - LPA 2 hours",
+                                     "LPA 24 hours - LPA 8 hours",
+                                     "LPA 3 days - LPA 8 hours",
+                                     "LPA 3 days - LPA 24 hours"),
+                            tstat = c(7.703, 3.043, 4.710, 3.321,
+                                      -4.6660, -0.7752, -3.8460, 2.8270,
+                                      0.6097, -2.294),
+                            adj_pval = c(5.092e-11, 4.049e-02, 1.591e-04, 1.817e-02,
+                                         7.528e-05, 9.965e-01, 1.895e-03, 0.0573,
+                                         0.9995, 0.2132))
+
+aim1_dunnettT3_est_full <- rbind(trap6_dunnettT3_est_full, lpa_dunnettT3_est_full)
+
+aim1_res_full <- kbl(aim1_dunnettT3_est_full, 
+                      col.names = c("Comparison", "Test Statistic", "Adjusted p-value"),
+                      #format.args = list(scientific = FALSE),
+                      digits = 4,
+                      caption = "Pairwise Comparisons of Aim 1 Experiment",
+                      booktabs = T) %>% kable_styling(latex_options = "HOLD_position") %>%
+  add_footnote("From the Dunnett's T3 two-sided test for multiple comparisons with unequal variances", notation = "symbol")
+aim1_res_full
+```
+
+\newpage
+
+# References
+
+Bogatkevich, G. S., Tourkina, E., Silver, R. M., & Ludwicka-Bradley, A. (2001). Thrombin differentiates normal lung fibroblasts to a myofibroblast phenotype via the proteolytically activated receptor-1 and a protein kinase C-dependent pathway. *Journal of Biological Chemistry*, 276(48), 45184-45192.
+
+Cakouros, D., & Gronthos, S. (2020). Epigenetic regulators of mesenchymal stem/stromal cell lineage determination. *Current osteoporosis reports*, 18, 597-605.
+
+Delacre, M., Leys, C., Mora, Y. L., & Lakens, D. (2019). Taking parametric assumptions seriously: Arguments for the use of Welch’s F-test instead of the classical F-test in one-way ANOVA. *International Review of Social Psychology*, 32(1).
+
+Feng, C., Wang, H., Lu, N., Chen, T., He, H., & Lu, Y. (2014). Log-transformation and its implications for data analysis. *Shanghai archives of psychiatry*, 26(2), 105.
+
+Lee, S., & Lee, D. K. (2018). What is the proper way to apply the multiple comparison test?. *Korean journal of anesthesiology*, 71(5), 353-360.
+
+Pohlert T (2022). PMCMRplus: Calculate Pairwise Multiple Comparisons of Mean Rank Sums Extended. R package version 1.9.6, [https://CRAN.R-project.org/package=PMCMRplus](https://CRAN.R-project.org/package=PMCMRplus).
+
+Sauder, D. C., & DeMars, C. E. (2019). An updated recommendation for multiple comparisons. *Advances in Methods and Practices in Psychological Science*, 2(1), 26-44.
+  
+Schuster, R., Younesi, F., Ezzo, M., & Hinz, B. (2023). The Role of Myofibroblasts in Physiological and Pathological Tissue Repair. *Cold Spring Harbor perspectives in biology*, 15(1), a041231.
+
+Tang, N., Zhao, Y., Feng, R., Liu, Y., Wang, S., Wei, W., ... & Li, L. (2014). Lysophosphatidic acid accelerates lung fibrosis by inducing differentiation of mesenchymal stem cells into myofibroblasts. *Journal of Cellular and Molecular Medicine*, 18(1), 156-169.
+
