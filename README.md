@@ -1,2 +1,3 @@
 # STA490-Collab-Project
-Sept 2022-Apr 2023 STA490 Collaborative Project 
+
+Previous research has shown evidence that mechanical stressors lead to the activation of Mesenchymal Stromal Cell Myofibroblast Phenotypes (MSC-MF), in which DNA methylation plays a role in the phenotypic change. Controlled cell experiments are conducted to study the effect of TRAP-6, LPA and extracellular stretching on the MSCs’ DNA methylation level, respectively. One-way ANOVA and post-hoc comparison tests show a notable increase in DNA methylation levels for cells treated with TRAP-6 and LPA. Yet possibly due to cell detachment, post-stretching DNA methylation decreases.
